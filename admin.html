@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial; background: #0a0f1e; padding: 20px; color: white; }
+        .container { max-width: 1200px; margin: auto; }
+        .card { background: rgba(20,25,45,0.95); border-radius: 20px; padding: 25px; margin-bottom: 25px; border: 1px solid #667eea; }
+        h1, h2 { color: #667eea; }
+        input, select, button { padding: 10px; border-radius: 10px; border: none; margin: 5px; background: #1a1f2e; color: white; }
+        button { background: #667eea; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        .login-box { max-width: 400px; margin: 100px auto; text-align: center; }
+    </style>
+</head>
+<body>
+    <div id="loginDiv" class="login-box"><div class="card"><h2>Login</h2><input type="password" id="password" placeholder="Password"><br><button onclick="login()">Login</button><div id="loginStatus"></div></div></div>
+    <div id="panelDiv" style="display:none;" class="container">
+        <div class="card"><h1>💰 Salary Bot Admin</h1><button onclick="logout()" style="float:right">Logout</button><div style="clear:both"></div></div>
+        <div class="card"><h2>📤 Send USDT</h2><select id="fromWallet"></select><input type="text" id="toAddress" placeholder="Recipient Address"><input type="number" id="amount" placeholder="Amount"><button onclick="sendUSDT()">Send</button><div id="sendStatus"></div></div>
+        <div class="card"><h2>➕ Add Wallet</h2><input type="text" id="newName" placeholder="Name"><input type="text" id="newAddress" placeholder="0x..."><button onclick="addWallet()">Add</button><div id="addStatus"></div></div>
+        <div class="card"><h2>📋 Wallets</h2><table id="walletsTable"><thead><tr><th>Name</th><th>Address</th><th>Balance</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <script>
+        async function login(){
+            const pwd=document.getElementById('password').value;
+            const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})});
+            const data=await res.json();
+            if(data.success){ document.getElementById('loginDiv').style.display='none'; document.getElementById('panelDiv').style.display='block'; loadWallets();}
+            else document.getElementById('loginStatus').innerHTML='<div class="status error">Wrong</div>';
+        }
+        async function logout(){ await fetch('/api/logout'); location.reload(); }
+        async function loadWallets(){
+            const res=await fetch('/api/wallets'); const wallets=await res.json();
+            const tbody=document.querySelector('#walletsTable tbody'); const sel=document.getElementById('fromWallet');
+            tbody.innerHTML=''; sel.innerHTML='';
+            wallets.forEach(w=>{
+                tbody.innerHTML+=`<tr><td>${w.name}</td><td>${w.address}</td><td>${w.balance} USDT</td></tr>`;
+                sel.innerHTML+=`<option value="${w.full_address}|${w.name}">${w.name} (${w.balance} USDT)</option>`;
+            });
+        }
+        async function sendUSDT(){
+            const val=document.getElementById('fromWallet').value; const [addr,name]=val.split('|');
+            const to=document.getElementById('toAddress').value; const amt=document.getElementById('amount').value;
+            const res=await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from_address:addr,from_name:name,to_address:to,amount:amt})});
+            const data=await res.json();
+            document.getElementById('sendStatus').innerHTML=data.success?`✅ Sent! ${data.tx_hash.slice(0,10)}...`:`❌ ${data.error}`;
+            if(data.success) loadWallets();
+        }
+        async function addWallet(){
+            const name=document.getElementById('newName').value; const addr=document.getElementById('newAddress').value;
+            const res=await fetch('/api/add_wallet',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,address:addr})});
+            const data=await res.json();
+            document.getElementById('addStatus').innerHTML=data.success?'✅ Added':`❌ Error`;
+            if(data.success){ document.getElementById('newName').value=''; document.getElementById('newAddress').value=''; loadWallets();}
+        }
+    </script>
+</body>
+</html>

